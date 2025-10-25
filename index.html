@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Расчёт дульной энергии</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+
+    /* Кнопки весов */
+    .mass-buttons {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .mass-btn {
+      width: 60px;
+      height: 60px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .mass-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Поля ввода */
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="number"] {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    /* Поле энергии — теперь только классы управляют цветом */
+    #energyOutput {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 8px;
+      color: white;
+      transition: background-color 0.3s ease;
+    }
+
+    /* Дефолтное состояние — серый */
+    #energyOutput.default {
+      background-color: #95a5a6;
+    }
+
+    #energyOutput.success {
+      background-color: #2ecc71; /* Зелёный */
+    }
+
+    #energyOutput.error {
+      background-color: #e74c3c; /* Красный */
+    }
+
+    /* Режимы */
+    .mode-buttons {
+      display: flex;
+      justify-content: space-around;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #95a5a6;
+      color: white;
+    }
+
+    .mode-btn.active {
+      background: #2c3e50;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🎯 Расчёт дульной энергии</h2>
+
+  <!-- Кнопки весов -->
+  <div class="mass-buttons">
+    <button class="mass-btn" data-mass="0.20">0.20 г</button>
+    <button class="mass-btn" data-mass="0.25">0.25 г</button>
+    <button class="mass-btn" data-mass="0.28">0.28 г</button>
+    <button class="mass-btn" data-mass="0.30">0.30 г</button>
+    <button class="mass-btn" data-mass="0.40">0.40 г</button>
+  </div>
+
+  <!-- Поля ввода -->
+  <div class="input-group">
+    <input type="number" id="mass" placeholder="Вес пули (г)" step="0.01" min="0.01" max="10">
+    <input type="number" id="velocity" placeholder="Скорость (м/с)" step="0.1" min="1">
+  </div>
+
+  <button onclick="calculateEnergy()" style="width:100%; padding:12px; font-size:16px; background:#27ae60; color:white; border:none; border-radius:8px;">
+    Рассчитать
+  </button>
+
+  <!-- Вывод энергии -->
+  <div id="energyOutput" class="default">Дульная энергия: ? Дж</div>
+
+  <!-- Режимы -->
+  <div class="mode-buttons">
+    <button class="mode-btn" id="modeAssault" onclick="setMode('assault')">Штурм</button>
+    <button class="mode-btn" id="modeSniper" onclick="setMode('sniper')">Снайпер</button>
+    <button class="mode-btn" id="modePulik" onclick="setMode('pulik')">Пулик</button>
+  </div>
+</div>
+
+<script>
+  let currentEnergy = 0;
+  let currentMode = null;
+
+  const limits = {
+    assault: 1.69,
+    sniper: 3.00,
+    pulik: 2.25
+  };
+
+  const output = document.getElementById("energyOutput");
+
+  // Настройка кнопок веса
+  document.querySelectorAll('.mass-btn').forEach(btn => {
+    let pressTimer = null;
+    let currentMass = btn.getAttribute('data-mass');
+
+    function updateButtonText() {
+      btn.textContent = `${parseFloat(currentMass).toFixed(2)} г`;
+    }
+
+    // Touch events
+    btn.addEventListener('touchstart', () => {
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        const userValue = prompt(`Изменить вес (в граммах):`, currentMass);
+        if (userValue !== null && !isNaN(userValue) && userValue > 0 && userValue <= 10) {
+          currentMass = parseFloat(userValue).toFixed(2);
+          updateButtonText();
+          document.getElementById("mass").value = currentMass;
+          calculateEnergy();
+        } else if (userValue !== null) {
+          alert("Введите число от 0.01 до 10 грамм");
+        }
+      }, 800);
+    });
+
+    btn.addEventListener('touchend', () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        document.getElementById("mass").value = currentMass;
+      }
+    });
+
+    // Mouse events
+    btn.addEventListener('mousedown', () => {
+      pressTimer = setTimeout(() => {
+        const userValue = prompt(`Изменить вес:`, currentMass);
+        if (userValue !== null && !isNaN(userValue) && userValue > 0 && userValue <= 10) {
+          currentMass = parseFloat(userValue).toFixed(2);
+          updateButtonText();
+          document.getElementById("mass").value = currentMass;
+          calculateEnergy();
+        }
+      }, 800);
+    });
+
+    ['mouseup', 'mouseleave'].forEach(event => {
+      btn.addEventListener(event, () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          document.getElementById("mass").value = currentMass;
+        }
+        pressTimer = null;
+      });
+    });
+  });
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`mode${capitalize(mode)}`).classList.add('active');
+    updateEnergyColor(); // пересчитываем сразу после выбора режима
+  }
+
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  function calculateEnergy() {
+    const massInput = document.getElementById("mass").value;
+    const velocityInput = document.getElementById("velocity").value;
+
+    // Сброс к серому (дефолтному) состоянию
+    output.textContent = "Введите значения";
+    output.className = "default";
+
+    if (!massInput || !velocityInput) return;
+
+    const massKg = parseFloat(massInput) / 1000;
+    const velocity = parseFloat(velocityInput);
+
+    currentEnergy = 0.5 * massKg * velocity ** 2;
+    output.textContent = `Дульная энергия: ${currentEnergy.toFixed(2)} Дж`;
+
+    // Применяем цвет по выбранному режиму
+    if (currentMode) {
+      updateEnergyColor();
+    }
+  }
+
+  function updateEnergyColor() {
+  if (!currentMode || currentEnergy === 0) return;
+
+  const limit = limits[currentMode];
+
+  // Округляем энергию до 2 знаков после запятой для честного сравнения
+  const energyRounded = Math.round(currentEnergy * 100) / 100;
+
+  output.classList.remove("default", "success", "error");
+
+  if (energyRounded <= limit) {
+    output.classList.add("success");
+  } else {
+    output.classList.add("error");
+  }
+}
+
+  // Установка режима по умолчанию
+  setMode('assault');
+</script>
+
+</body>
+</html>
